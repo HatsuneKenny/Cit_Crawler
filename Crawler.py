@@ -74,9 +74,9 @@ def upload_to_s3(file_name, bucket_name):
 if __name__ == "__main__":
     # Ukázkový seznam URL
     urls = [
-        "https://www.novinky.cz/clanek/zahranicni-evropa-ukazkovy-clanek-1",
-        "https://www.novinky.cz/clanek/domaci-ukazkovy-clanek-2",
-        "https://www.novinky.cz/clanek/ekonomika-ukazkovy-clanek-3"
+        "https://www.novinky.cz/clanek/kultura-hudba-zemrel-colin-petersen-40497845",
+        "https://www.novinky.cz/clanek/auto-z-trhu-mizi-dalsi-petivalec-donkervoort-f22-se-louci-specialni-edici-40497813",
+        "https://www.novinky.cz/clanek/krimi-mohutny-vybuch-otrasl-nad-ranem-centrem-karlovych-varu-40497851"
     ]
 
     # Scraping
