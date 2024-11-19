@@ -50,9 +50,9 @@ def save_to_csv(data, filename='scraped_data.csv'):
 
 # Vstupní URL článků
 urls = [
-    'https://www.novinky.cz/clanek/zahranicni-evropa-ukazkovy-clanek-1',
-    'https://www.novinky.cz/clanek/ekonomika-ukazkovy-clanek-3',
-    'https://www.novinky.cz/clanek/domaci-ukazkovy-clanek-2'
+    'https://www.novinky.cz/clanek/krimi-mohutny-vybuch-otrasl-nad-ranem-centrem-karlovych-varu-40497851,
+    'https://www.novinky.cz/clanek/domaci-politici-se-prisli-rozloucit-s-marii-benesovou-40497922',
+    'https://www.novinky.cz/clanek/zahranicni-lavrov-ukrajina-chce-nasazenim-atacms-eskalovat-konflikt-40497931'
 ]
 
 # Scraping dat
