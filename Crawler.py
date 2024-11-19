@@ -2,19 +2,17 @@ import requests
 from bs4 import BeautifulSoup
 import csv
 import boto3
-from urllib.parse import urljoin
 from multiprocessing.dummy import Pool as ThreadPool
 
 # Scraper pro novinky.cz
 def scrape_novinky(url, visited):
+    if url in visited:
+        return None
+    visited.add(url)
+    
     try:
-        if url in visited:
-            return None  # Pokud už byla stránka zpracována, přeskočíme ji
-        visited.add(url)
-        
-        # Stáhnutí obsahu stránky
-        response = requests.get(url)
-        response.raise_for_status()
+        response = requests.get(url, timeout=10)  # Timeout přidán
+        response.raise_for_status()  # Zkontroluje HTTP chyby
         soup = BeautifulSoup(response.content, 'html.parser')
 
         # Extrahování dat
@@ -24,44 +22,33 @@ def scrape_novinky(url, visited):
         photos_count = len(soup.find_all('img'))
         content = ' '.join([p.get_text(strip=True) for p in soup.find_all('p')])
 
-        # Seznam odkazů na další články
-        links = [urljoin(url, a['href']) for a in soup.find_all('a', href=True) if 'novinky.cz' in a['href']]
-
-        # Filtrace článkových odkazů (můžeme přidat další podmínky pro filtrování nečlánkových URL)
-        links = [link for link in links if link.startswith('https://www.novinky.cz/clanek')]
-
         return {
             "title": title,
             "category": category,
             "comments": comments,
             "photos_count": photos_count,
-            "content": content,
-            "links": links  # Vráti všechny nové odkazy k dalšímu zpracování
+            "content": content
         }
-    except Exception as e:
-        print(f"Error scraping {url}: {e}")
+    except requests.exceptions.Timeout:
+        print(f"Timeout při pokusu o připojení k {url}")
+        return None
+    except requests.exceptions.RequestException as e:
+        print(f"Chyba při připojování k {url}: {e}")
         return None
 
 
-# Funkce pro procházení URL
+# Funkce pro více URL
 def scrape_multiple_urls(url_list):
-    visited = set()  # Set pro uchovávání navštívených URL
-    scraped_data = []
-    pool = ThreadPool(8)  # Paralelní scraping s 8 vlákny
-    while url_list:
-        # Vezmeme první URL v seznamu, zpracujeme ji a přidáme její odkazy do fronty
-        url = url_list.pop(0)
-        result = scrape_novinky(url, visited)
-        if result:
-            scraped_data.append(result)
-            url_list.extend(result["links"])  # Přidáme nové odkazy do fronty
+    visited = set()  # Sada pro záznam již navštívených URL
+    pool = ThreadPool(16)  # Zvýšení počtu vláken na 16 pro rychlejší zpracování
+    results = pool.map(lambda url: scrape_novinky(url, visited), url_list)
     pool.close()
     pool.join()
-    return scraped_data
+    return [result for result in results if result is not None]
 
 
 # Uložení do CSV
-def save_to_csv(data, filename="output.csv"):
+def save_to_csv(data, filename="scraped_data.csv"):
     if not data:
         print("No data to save!")
         return
@@ -85,9 +72,11 @@ def upload_to_s3(file_name, bucket_name):
 
 # Hlavní funkce
 if __name__ == "__main__":
-    # Počáteční URL pro crawler
+    # Ukázkový seznam URL
     urls = [
-        "https://www.novinky.cz"  # Můžete začít i hlavní stránkou
+        "https://www.novinky.cz/clanek/zahranicni-evropa-ukazkovy-clanek-1",
+        "https://www.novinky.cz/clanek/domaci-ukazkovy-clanek-2",
+        "https://www.novinky.cz/clanek/ekonomika-ukazkovy-clanek-3"
     ]
 
     # Scraping
@@ -97,5 +86,5 @@ if __name__ == "__main__":
     save_to_csv(scraped_data, "scraped_data.csv")
 
     # Nahrání na S3 (nastavte svůj bucket)
-    bucket_name = "moje-s3-bucket"  # Zde nahraďte názvem svého bucketu
+    bucket_name = "moje-s3-bucket"  # Nahraďte názvem svého S3 bucketu
     upload_to_s3("scraped_data.csv", bucket_name)
