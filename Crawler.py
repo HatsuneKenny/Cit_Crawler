@@ -2,44 +2,62 @@ import requests
 from bs4 import BeautifulSoup
 import csv
 import boto3
+from urllib.parse import urljoin
 from multiprocessing.dummy import Pool as ThreadPool
 
-
 # Scraper pro novinky.cz
-def scrape_novinky(url):
+def scrape_novinky(url, visited):
     try:
+        if url in visited:
+            return None  # Pokud už byla stránka zpracována, přeskočíme ji
+        visited.add(url)
+        
+        # Stáhnutí obsahu stránky
         response = requests.get(url)
         response.raise_for_status()
         soup = BeautifulSoup(response.content, 'html.parser')
 
         # Extrahování dat
         title = soup.find('h1').get_text(strip=True) if soup.find('h1') else "N/A"
-        category = soup.find('div', class_='category').get_text(strip=True) if soup.find('div',
-                                                                                         class_='category') else "N/A"
-        comments = soup.find('span', class_='comments-count').get_text(strip=True) if soup.find('span',
-                                                                                                class_='comments-count') else "0"
+        category = soup.find('div', class_='category').get_text(strip=True) if soup.find('div', class_='category') else "N/A"
+        comments = soup.find('span', class_='comments-count').get_text(strip=True) if soup.find('span', class_='comments-count') else "0"
         photos_count = len(soup.find_all('img'))
         content = ' '.join([p.get_text(strip=True) for p in soup.find_all('p')])
+
+        # Seznam odkazů na další články
+        links = [urljoin(url, a['href']) for a in soup.find_all('a', href=True) if 'novinky.cz' in a['href']]
+
+        # Filtrace článkových odkazů (můžeme přidat další podmínky pro filtrování nečlánkových URL)
+        links = [link for link in links if link.startswith('https://www.novinky.cz/clanek')]
 
         return {
             "title": title,
             "category": category,
             "comments": comments,
             "photos_count": photos_count,
-            "content": content
+            "content": content,
+            "links": links  # Vráti všechny nové odkazy k dalšímu zpracování
         }
     except Exception as e:
         print(f"Error scraping {url}: {e}")
         return None
 
 
-# Funkce pro více URL
+# Funkce pro procházení URL
 def scrape_multiple_urls(url_list):
+    visited = set()  # Set pro uchovávání navštívených URL
+    scraped_data = []
     pool = ThreadPool(8)  # Paralelní scraping s 8 vlákny
-    results = pool.map(scrape_novinky, url_list)
+    while url_list:
+        # Vezmeme první URL v seznamu, zpracujeme ji a přidáme její odkazy do fronty
+        url = url_list.pop(0)
+        result = scrape_novinky(url, visited)
+        if result:
+            scraped_data.append(result)
+            url_list.extend(result["links"])  # Přidáme nové odkazy do fronty
     pool.close()
     pool.join()
-    return [result for result in results if result is not None]
+    return scraped_data
 
 
 # Uložení do CSV
@@ -67,11 +85,9 @@ def upload_to_s3(file_name, bucket_name):
 
 # Hlavní funkce
 if __name__ == "__main__":
-    # Ukázkový seznam URL
+    # Počáteční URL pro crawler
     urls = [
-        "https://www.novinky.cz/clanek/krimi-mohutny-vybuch-otrasl-nad-ranem-centrem-karlovych-varu-40497851",
-        "https://www.novinky.cz/clanek/valka-na-ukrajine-rusko-uz-nemusi-byt-napadeno-jadernymi-zbranemi-aby-je-samo-pouzilo-40497833",
-        "https://www.novinky.cz/clanek/kultura-hudba-zemrel-colin-petersen-40497845"
+        "https://www.novinky.cz"  # Můžete začít i hlavní stránkou
     ]
 
     # Scraping
@@ -81,5 +97,5 @@ if __name__ == "__main__":
     save_to_csv(scraped_data, "scraped_data.csv")
 
     # Nahrání na S3 (nastavte svůj bucket)
-    bucket_name = "moje-s3-bucket"
+    bucket_name = "moje-s3-bucket"  # Zde nahraďte názvem svého bucketu
     upload_to_s3("scraped_data.csv", bucket_name)
