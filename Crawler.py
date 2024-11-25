@@ -8,9 +8,7 @@ START_URLS = [
     "https://www.novinky.cz",  # Novinky.cz
     "https://www.idnes.cz",    # iDnes.cz
     "https://www.aktualne.cz", # Aktuálně.cz
-    "https://www.seznamzpravy.cz", 
     "https://www.ceskatelevize.cz/ct24",
-    "https://echo24.cz",
     "https://www.tyden.cz"
 ]
 
