@@ -9,7 +9,8 @@ START_URLS = [
     "https://www.idnes.cz",    # iDnes.cz
     "https://www.aktualne.cz", # Aktuálně.cz
     "https://www.ceskatelevize.cz/ct24",
-    "https://www.tyden.cz"
+    "https://www.tyden.cz",
+    "https://www.ctk.cz"
 ]
 
 MAX_URLS = 1000  # Maximální počet URL k prozkoumání
