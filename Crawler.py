@@ -1,77 +1,44 @@
 import requests
 from bs4 import BeautifulSoup
 import csv
-from concurrent.futures import ThreadPoolExecutor
+import time
 
-# Funkce pro sběr URL
-def collect_urls(start_url, max_urls=1000):
-    """Sbírá odkazy na články z výchozí stránky."""
-    collected_urls = set()
-    visited_urls = set()
-    to_visit = [start_url]
-
-    while to_visit and len(collected_urls) < max_urls:
-        current_url = to_visit.pop(0)
-        if current_url in visited_urls:
-            continue
-
-        try:
-            response = requests.get(current_url)
-            response.raise_for_status()
-            soup = BeautifulSoup(response.text, 'html.parser')
-
-            for link in soup.find_all('a', href=True):
-                url = link['href']
-                if 'novinky.cz/clanek/' in url and url not in collected_urls:
-                    collected_urls.add(url)
-                    to_visit.append(url)
-            visited_urls.add(current_url)
-        except Exception as e:
-            print(f"Error collecting URLs from {current_url}: {e}")
-
-    return list(collected_urls)
+# Konfigurace sběru dat
+START_URLS = {
+    "novinky": "https://www.novinky.cz",
+    "idnes": "https://www.idnes.cz",
+    "aktualne": "https://www.aktualne.cz"
+}
+MAX_SIZE_MB = 2000  # Limit dat ke stažení (2 GB)
+OUTPUT_FILE = "scraped_data.csv"
 
 # Funkce pro stahování dat z článků
-def scrape_novinky(url, visited):
-    """Stahuje obsah článku a přidává jej do seznamu navštívených."""
-    if url in visited:
-        return None
-    visited.add(url)
-
+def scrape_article(url, website):
+    """Stahuje obsah článku z různých webů."""
     try:
         response = requests.get(url)
         response.raise_for_status()
         soup = BeautifulSoup(response.text, 'html.parser')
 
-        title = soup.find('h1').get_text(strip=True) if soup.find('h1') else 'No title'
-        category = soup.find('a', class_='category').get_text(strip=True) if soup.find('a', class_='category') else 'Unknown'
-        comments = len(soup.find_all('div', class_='comment'))  # Pokud jsou komentáře viditelné
-        images = len(soup.find_all('img'))
-        content = ' '.join([p.get_text(strip=True) for p in soup.find_all('p')])
-        publication_date = soup.find('time')['datetime'] if soup.find('time') else 'Unknown'
+        if website == "novinky":
+            title = soup.find('h1').get_text(strip=True) if soup.find('h1') else 'No title'
+            content = ' '.join([p.get_text(strip=True) for p in soup.find_all('p')])
+        elif website == "idnes":
+            title = soup.find('h1', class_='document-title').get_text(strip=True) if soup.find('h1', class_='document-title') else 'No title'
+            content = ' '.join([p.get_text(strip=True) for p in soup.find_all('p')])
+        elif website == "aktualne":
+            title = soup.find('h1').get_text(strip=True) if soup.find('h1') else 'No title'
+            content = ' '.join([p.get_text(strip=True) for p in soup.find_all('p')])
+        else:
+            return None  # Web není podporován
 
-        return {
-            'url': url,
-            'title': title,
-            'category': category,
-            'comments': comments,
-            'images': images,
-            'content': content,
-            'publication_date': publication_date
-        }
+        return {"url": url, "title": title, "content": content}
     except Exception as e:
         print(f"Error scraping {url}: {e}")
         return None
 
-# Paralelní stahování
-def scrape_multiple_urls_parallel(urls):
-    visited = set()
-    with ThreadPoolExecutor(max_workers=10) as executor:
-        results = list(executor.map(lambda url: scrape_novinky(url, visited), urls))
-    return [res for res in results if res]
-
 # Funkce pro ukládání dat do CSV
-def save_to_csv(data, filename='scraped_data.csv'):
+def save_to_csv(data, filename):
     if not data:
         print("No data to save!")
         return
@@ -84,16 +51,37 @@ def save_to_csv(data, filename='scraped_data.csv'):
 
 # Hlavní program
 if __name__ == "__main__":
-    # Výchozí URL a maximální počet článků
-    start_url = 'https://www.novinky.cz/'
-    max_urls = 1000
+    scraped_data = []
+    visited_urls = set()
+    start_time = time.time()
 
-    print("Collecting URLs...")
-    urls = collect_urls(start_url, max_urls)
-    print(f"Collected {len(urls)} URLs.")
+    print("Starting data collection...")
+    for website, start_url in START_URLS.items():
+        print(f"Collecting data from {website}...")
 
-    print("Scraping data from articles...")
-    scraped_data = scrape_multiple_urls_parallel(urls)
+        # Například přidáme manuální seznam URL pro každý web
+        urls = [
+            f"{start_url}/clanek/zpravy-novinka-1",
+            f"{start_url}/clanek/zpravy-novinka-2"
+        ]  # Tento seznam uprav dle skutečných URL
 
-    print("Saving data to CSV...")
-    save_to_csv(scraped_data)
+        for url in urls:
+            if len(scraped_data) * 0.001 >= MAX_SIZE_MB:
+                print("Reached maximum data size!")
+                break
+            if url in visited_urls:
+                continue
+
+            article_data = scrape_article(url, website)
+            if article_data:
+                scraped_data.append(article_data)
+                visited_urls.add(url)
+
+            # Kontrola času (např. max 6 hodin)
+            elapsed_time = time.time() - start_time
+            if elapsed_time > 6 * 3600:
+                print("Reached maximum time limit!")
+                break
+
+    save_to_csv(scraped_data, OUTPUT_FILE)
+    print("Data collection finished.")
