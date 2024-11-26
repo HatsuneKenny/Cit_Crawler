@@ -30,7 +30,7 @@ def collect_article_urls(base_url):
 
         try:
             response = requests.get(current_url)
-            response.raise_for_status()
+            response.raise_for_status()  # Zajistí, že nedojde k chybám HTTP
             soup = BeautifulSoup(response.text, 'html.parser')
 
             # Vyhledávání všech odkazů na články
@@ -76,8 +76,18 @@ def download_images(soup, base_url):
 def scrape_article(url):
     """Stahuje obsah článku."""
     try:
+        # Zkontrolujeme, zda je URL validní
+        if not url or not url.startswith("http"):
+            print(f"Skipping invalid URL: {url}")
+            return None
+        
         response = requests.get(url)
-        response.raise_for_status()
+        
+        # Kontrola, zda je stránka dostupná (status kód 200)
+        if response.status_code != 200:
+            print(f"Skipping URL (status code {response.status_code}): {url}")
+            return None
+        
         soup = BeautifulSoup(response.text, 'html.parser')
 
         # Stahování obrázků
