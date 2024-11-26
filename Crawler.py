@@ -7,7 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 START_URLS = [
     "https://www.novinky.cz",  # Novinky.cz
     "https://www.idnes.cz",    # iDnes.cz
-    "https://www.ctk.cz"  # CTK.cz
+    "https://www.ctk.cz"  # Aktuálně.cz
 ]
 
 MAX_URLS = 1000  # Maximální počet URL k prozkoumání
@@ -16,7 +16,7 @@ OUTPUT_FILE = "scraped_data.csv"
 # Funkce pro sběr URL článků
 def collect_article_urls(base_url):
     """Sbírá odkazy na články z dané domény."""
-    collected_urls = set()
+    collected_urls = []  # List místo set, aby bylo možné sbírat duplicity
     to_visit = [base_url]
     visited_urls = set()
 
@@ -29,18 +29,27 @@ def collect_article_urls(base_url):
         try:
             response = requests.get(current_url)
             response.raise_for_status()
+
+            # Kontrola, zda stránka není blokována nebo vyžaduje přihlášení
+            if response.status_code == 403:
+                print(f"Access denied to {current_url}, skipping...")
+                continue  # Pokud je přístup zamítnut (např. 403), přeskočíme tuto stránku
+            if response.status_code == 401:
+                print(f"Login required for {current_url}, skipping...")
+                continue  # Pokud je stránka chráněná přihlášením (např. 401), přeskočíme ji
+
             soup = BeautifulSoup(response.text, 'html.parser')
 
             # Vyhledávání všech odkazů na články
             for link in soup.find_all('a', href=True):
                 url = link['href']
-                if base_url in url and url not in collected_urls:  # Zajistíme, že to bude odkaz na stejnou doménu
-                    collected_urls.add(url)
+                if base_url in url:  # Zajistíme, že to bude odkaz na stejnou doménu
+                    collected_urls.append(url)  # Ukládáme všechny odkazy, i duplicity
                     to_visit.append(url)
         except Exception as e:
             print(f"Error collecting URLs from {current_url}: {e}")
 
-    return list(collected_urls)
+    return collected_urls  # Vracíme list s duplicity
 
 # Funkce pro stahování dat z článků
 def scrape_article(url):
@@ -48,6 +57,15 @@ def scrape_article(url):
     try:
         response = requests.get(url)
         response.raise_for_status()
+
+        # Kontrola, zda stránka není blokována nebo vyžaduje přihlášení
+        if response.status_code == 403:
+            print(f"Access denied to {url}, skipping...")
+            return None  # Pokud je přístup zamítnut (např. 403), přeskočíme tuto stránku
+        if response.status_code == 401:
+            print(f"Login required for {url}, skipping...")
+            return None  # Pokud je stránka chráněná přihlášením (např. 401), přeskočíme ji
+
         soup = BeautifulSoup(response.text, 'html.parser')
 
         # Získání nadpisu
