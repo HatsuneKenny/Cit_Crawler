@@ -3,6 +3,7 @@ from bs4 import BeautifulSoup
 import csv
 import os
 from concurrent.futures import ThreadPoolExecutor
+import time
 
 # Konfigurace sběru dat pro více stránek
 START_URLS = [
@@ -50,27 +51,54 @@ def scrape_article(url):
     try:
         response = requests.get(url)
         response.raise_for_status()
-        
-        # Zkontrolujeme, zda obsah není prázdný
-        if not response.text.strip():
+
+        # Kontrola, zda stránka není prázdná
+        if not response.text.strip():  # Pokud je obsah prázdný, pokračujeme dál
             print(f"Skipping empty page: {url}")
             return None
 
         soup = BeautifulSoup(response.text, 'html.parser')
 
+        # Titulek článku
         title = soup.find('h1').get_text(strip=True) if soup.find('h1') else 'No title'
-        category = soup.find('span', class_='category')  # Příklad pro kategorie, uprav podle skutečného HTML
-        category = category.get_text(strip=True) if category else 'No category'
-        comments = soup.find('span', class_='comments-count')  # Příklad pro počet komentářů
-        comments = comments.get_text(strip=True) if comments else '0'
-        images = len(soup.find_all('img'))  # Počet obrázků
+        
+        # Obsah článku
         content = ' '.join([p.get_text(strip=True) for p in soup.find_all('p')])
-        date = soup.find('time')  # Příklad pro datum publikace
-        date = date.get_text(strip=True) if date else 'No date'
 
-        return {"url": url, "title": title, "category": category, "comments": comments, "images": images, "content": content, "date": date}
-    except Exception as e:
+        # Počet obrázků
+        images = len(soup.find_all('img'))
+        
+        # Kategorie článku
+        category = soup.find('meta', {'property': 'article:section'})
+        category = category['content'] if category else 'No category'
+
+        # Počet komentářů (pokud je dostupný)
+        comments = soup.find('a', {'class': 'comments-link'})
+        comments_count = comments.get_text(strip=True) if comments else 'No comments'
+
+        # Datum publikace
+        date = soup.find('meta', {'property': 'article:published_time'})
+        date = date['content'] if date else 'No date'
+
+        # Kontrola, zda článek není prázdný
+        if not content.strip():  # Pokud obsah článku je prázdný, ignorujeme stránku
+            print(f"Skipping empty article content: {url}")
+            return None
+
+        return {
+            "url": url,
+            "title": title,
+            "content": content,
+            "images": images,
+            "category": category,
+            "comments_count": comments_count,
+            "date": date
+        }
+    except requests.exceptions.RequestException as e:
         print(f"Error scraping {url}: {e}")
+        return None
+    except Exception as e:
+        print(f"Unexpected error scraping {url}: {e}")
         return None
 
 # Funkce pro paralelní stahování
@@ -79,28 +107,29 @@ def scrape_multiple_urls_parallel(urls):
         results = list(executor.map(scrape_article, urls))
     return [res for res in results if res]
 
-# Funkce pro ukládání dat do CSV s kontrolou velikosti souboru
+# Funkce pro kontrolu velikosti souboru
+def check_file_size(file_path):
+    if os.path.exists(file_path):
+        return os.path.getsize(file_path)
+    return 0
+
+# Funkce pro ukládání dat do CSV
 def save_to_csv(data, filename):
     if not data:
         print("No data to save!")
         return
 
-    # Otevření souboru pro zápis
+    if check_file_size(filename) > MAX_FILE_SIZE:
+        print(f"File size exceeds {MAX_FILE_SIZE / 1024 / 1024 / 1024} GB. Stopping.")
+        return
+
+    file_exists = os.path.exists(filename)
+    
     with open(filename, mode='a', encoding='utf-8', newline='') as file:
         writer = csv.DictWriter(file, fieldnames=data[0].keys())
-        
-        # Zkontrolujeme, zda soubor již existuje a pokud ne, přidáme hlavičku
-        if os.path.getsize(filename) == 0:
+        if not file_exists:
             writer.writeheader()
-
-        for row in data:
-            # Před zápisem zkontrolujeme velikost souboru
-            if os.path.getsize(filename) > MAX_FILE_SIZE:
-                print("Reached maximum file size of 2GB. Stopping...")
-                return
-
-            writer.writerow(row)
-
+        writer.writerows(data)
     print(f"Data successfully saved to {filename}.")
 
 # Hlavní program
