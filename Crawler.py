@@ -7,7 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 START_URLS = [
     "https://www.novinky.cz",  # Novinky.cz
     "https://www.idnes.cz",    # iDnes.cz
-    "https://www.aktualne.cz"  # Aktuálně.cz
+    "https://www.ctk.cz"  # CTK.cz
 ]
 
 MAX_URLS = 1000  # Maximální počet URL k prozkoumání
@@ -50,10 +50,33 @@ def scrape_article(url):
         response.raise_for_status()
         soup = BeautifulSoup(response.text, 'html.parser')
 
+        # Získání nadpisu
         title = soup.find('h1').get_text(strip=True) if soup.find('h1') else 'No title'
-        content = ' '.join([p.get_text(strip=True) for p in soup.find_all('p')])
         
-        return {"url": url, "title": title, "content": content}
+        # Získání kategorie (pokud je dostupná)
+        category = soup.find('a', class_='category').get_text(strip=True) if soup.find('a', class_='category') else 'Unknown'
+
+        # Počet komentářů (pokud je počet komentářů zobrazen)
+        comments = len(soup.find_all('div', class_='comment'))  # Může se lišit v závislosti na stránce
+
+        # Počet fotek
+        images = len(soup.find_all('img'))
+
+        # Obsah článku
+        content = ' '.join([p.get_text(strip=True) for p in soup.find_all('p')])
+
+        # Datum vytvoření (pokud je dostupné)
+        publication_date = soup.find('time')['datetime'] if soup.find('time') else 'Unknown'
+
+        return {
+            "url": url,
+            "title": title,
+            "category": category,
+            "comments": comments,
+            "images": images,
+            "content": content,
+            "publication_date": publication_date
+        }
     except Exception as e:
         print(f"Error scraping {url}: {e}")
         return None
