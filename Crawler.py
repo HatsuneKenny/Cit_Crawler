@@ -9,7 +9,7 @@ import time
 START_URLS = [
     "https://www.novinky.cz",  # Novinky.cz
     "https://www.idnes.cz",    # iDnes.cz
-    "https://www.aktualne.cz"  # Aktuálně.cz
+    "https://www.ctk.cz"  # CTK.cz
 ]
 
 MAX_URLS = 5000  # Maximální počet URL k prozkoumání
