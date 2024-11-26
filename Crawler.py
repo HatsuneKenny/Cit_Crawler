@@ -12,7 +12,7 @@ START_URLS = [
     "https://www.aktualne.cz"  # Aktuálně.cz
 ]
 
-MAX_URLS = 1000  # Maximální počet URL k prozkoumání
+MAX_URLS = 5000  # Maximální počet URL k prozkoumání
 OUTPUT_FILE = "scraped_data.csv"
 MAX_FILE_SIZE = 2 * 1024 * 1024 * 1024  # 2 GB
 
@@ -80,6 +80,14 @@ def scrape_article(url):
         date = soup.find('meta', {'property': 'article:published_time'})
         date = date['content'] if date else 'No date'
 
+        # Další metadaty, které bychom mohli přidat
+        author = soup.find('meta', {'name': 'author'})
+        author = author['content'] if author else 'No author'
+
+        # Počet sdílení na sociálních sítích
+        share_count = soup.find('div', {'class': 'social-share-count'})
+        share_count = share_count.get_text(strip=True) if share_count else 'No share count'
+
         # Kontrola, zda článek není prázdný
         if not content.strip():  # Pokud obsah článku je prázdný, ignorujeme stránku
             print(f"Skipping empty article content: {url}")
@@ -92,7 +100,9 @@ def scrape_article(url):
             "images": images,
             "category": category,
             "comments_count": comments_count,
-            "date": date
+            "date": date,
+            "author": author,
+            "share_count": share_count
         }
     except requests.exceptions.RequestException as e:
         print(f"Error scraping {url}: {e}")
