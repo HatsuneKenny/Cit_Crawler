@@ -7,12 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 START_URLS = [
     "https://www.novinky.cz",  # Novinky.cz
     "https://www.idnes.cz",    # iDnes.cz
-    "https://www.aktualne.cz", # Aktuálně.cz
-    "https://www.ceskatelevize.cz/ct24",
-    "https://www.tyden.cz",
-    "https://www.ctk.cz",
-    "https://www.lidovky.cz",
-    "https://hn.cz"
+    "https://www.ctk.cz"
 ]
 
 # Funkce pro sběr URL z jedné stránky
