@@ -127,14 +127,19 @@ def scrape_multiple_urls_parallel(urls, batch_size=100):
         for i in range(0, total_urls, batch_size):
             batch = urls[i:i + batch_size]
             print(f"Scraping batch {i // batch_size + 1} | URLs {i + 1}-{min(i + batch_size, total_urls)}")
-            results.extend(executor.map(scrape_article, batch))
+            batch_results = list(executor.map(scrape_article, batch))
+            batch_results = [res for res in batch_results if res]  # Odstraň prázdné výsledky
+
+            # Uložíme po každém batchi, aby se minimalizovala ztráta dat
+            save_to_csv(batch_results, OUTPUT_FILE)
+
             # Zalogujeme velikost souboru
             current_file_size_gb = get_file_size_in_gb(OUTPUT_FILE)
             print(f"Current collected data size: {current_file_size_gb:.2f} GB")
             if current_file_size_gb >= MAX_FILE_SIZE / (1024 ** 3):
                 print(f"Reached file size limit of {MAX_FILE_SIZE / (1024 ** 3):.2f} GB. Stopping scraping.")
                 break
-    return [res for res in results if res]
+    return results
 
 
 # Ukládání dat do CSV
@@ -170,11 +175,7 @@ if __name__ == "__main__":
 
     # Sbíráme data z článků
     print("Scraping data from articles...")
-    scraped_data = scrape_multiple_urls_parallel(all_collected_urls)
-
-    # Ukládáme data do CSV
-    print("Saving data to CSV...")
-    save_to_csv(scraped_data, OUTPUT_FILE)
+    scrape_multiple_urls_parallel(all_collected_urls)
 
     # Konečné shrnutí
     final_file_size_gb = get_file_size_in_gb(OUTPUT_FILE)
