@@ -7,8 +7,8 @@ from concurrent.futures import ThreadPoolExecutor
 # Konfigurace sběru dat pro více stránek
 START_URLS = [
     "https://www.novinky.cz",  # Novinky.cz
-    "https://www.idnes.cz",  # iDnes.cz
-    "https://www.ctk.cz"  # CTK.cz
+    "https://www.idnes.cz",    # iDnes.cz
+    "https://www.ctk.cz"       # CTK.cz
 ]
 
 MAX_URLS = 5000  # Maximální počet URL k prozkoumání
@@ -119,7 +119,23 @@ def get_file_size_in_gb(filename):
     return 0
 
 
-# Paralelní zpracování URL
+# Ukládání dat do CSV
+def save_to_csv(data, filename):
+    if not data:
+        print("No data to save!")
+        return
+
+    file_exists = os.path.exists(filename)
+
+    with open(filename, mode='a', encoding='utf-8', newline='') as file:
+        writer = csv.DictWriter(file, fieldnames=data[0].keys())
+        if not file_exists:
+            writer.writeheader()
+        writer.writerows(data)
+    print(f"Data successfully saved to {filename}. Current size: {get_file_size_in_gb(filename):.2f} GB")
+
+
+# Paralelní zpracování URL s batchováním
 def scrape_multiple_urls_parallel(urls, batch_size=100):
     results = []
     total_urls = len(urls)
@@ -136,26 +152,11 @@ def scrape_multiple_urls_parallel(urls, batch_size=100):
             # Zalogujeme velikost souboru
             current_file_size_gb = get_file_size_in_gb(OUTPUT_FILE)
             print(f"Current collected data size: {current_file_size_gb:.2f} GB")
+
             if current_file_size_gb >= MAX_FILE_SIZE / (1024 ** 3):
                 print(f"Reached file size limit of {MAX_FILE_SIZE / (1024 ** 3):.2f} GB. Stopping scraping.")
                 break
     return results
-
-
-# Ukládání dat do CSV
-def save_to_csv(data, filename):
-    if not data:
-        print("No data to save!")
-        return
-
-    file_exists = os.path.exists(filename)
-
-    with open(filename, mode='a', encoding='utf-8', newline='') as file:
-        writer = csv.DictWriter(file, fieldnames=data[0].keys())
-        if not file_exists:
-            writer.writeheader()
-        writer.writerows(data)
-    print(f"Data successfully saved to {filename}. Current size: {get_file_size_in_gb(filename):.2f} GB")
 
 
 # Hlavní program
